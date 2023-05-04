@@ -1,12 +1,21 @@
 
-let width = 500;
-let height = 300;
-const nDice = 5;
+const width = 500;
+const height = 300;
+const nDice = 2;
 const diceSize = 50;
 const spriteScale = diceSize / 100;
 
 var dice = [], diceDistances = [], rolls = [];
 var results = [];
+var diceLinks = [];
+var linked = false;
+
+// create a variable to track whether the dice is rolling
+var isRolling = false;
+let allResults = [];
+let result = [];
+let res;
+
 
 // create an array of dice face images
 var diceFaces = [
@@ -30,7 +39,7 @@ var engine = Matter.Engine.create();
 
 // create a renderer
 var render = Matter.Render.create({
-    element: document.body,
+    element: document.getElementById("dice-container"),
     engine: engine,
     showSleeping: true,
     options: {
@@ -55,7 +64,7 @@ container.push(Matter.Bodies.rectangle(width / 2, height / 2, width, height, {
     isStatic: true,
     friction: floorStatic,
     frictionStatic: floorStatic,
-    render: { fillStyle: "lightgreen" }
+    render: { fillStyle: "white" }
 }));
 // bottom
 container.push(Matter.Bodies.rectangle(width / 2, height + boundaryWidth / 2 - 5, width, boundaryWidth, {
@@ -89,7 +98,7 @@ for (let i = 0; i < nDice; i++) {
         frictionStatic: 0,
         frictionAir: 0.05,
         sleepThreshold: 15,
-        collisionFilter: {category: 1},
+        collisionFilter: {category: 0b10},
         render: {
             fillStyle: "black",
             strokeStyle: "black",
@@ -103,36 +112,18 @@ for (let i = 0; i < nDice; i++) {
 
 }
 
-var diceLinks = [];
-var linked = false;
-
-function linkDice() {
-
-    linked = true;
-
-    for (let i = 0; i < dice.length - 1; i++) {
-        var link = Constraint.create({
-            bodyA: dice[i].body,
-            bodyB: dice[i + 1].body,
-            length: 40,
-            stiffness: 0.5,
-            damping: 0.001,
-            render: { visible: false }
-        });
-
-        diceLinks.push(link);
-    }
-
-
-    Composite.add(engine.world, diceLinks);
-}
-
-function unlinkDice() {
-    linked = false;
-    Composite.remove(engine.world, diceLinks);
-}
 
 Matter.World.add(engine.world, dice.map(d => d.body));
+
+
+// create a mouse constraint
+var mouseConstraint = Matter.MouseConstraint.create(engine, {
+    element: render.canvas,
+    collisionFilter: {mask: 0b10}
+});
+
+// add the mouse constraint to the world
+Matter.World.add(engine.world, mouseConstraint);
 
 
 // start the engine
@@ -142,23 +133,9 @@ Matter.Runner.run(engine);
 Matter.Render.run(render);
 
 
-// create a mouse constraint
-var mouseConstraint = Matter.MouseConstraint.create(engine, {
-    element: render.canvas,
-    collisionFilter: {category: 1}
-});
-
-// add the mouse constraint to the world
-Matter.World.add(engine.world, mouseConstraint);
 
 
 
-// create a variable to track whether the dice is rolling
-var isRolling = false;
-
-// var spinFactor;
-
-// create a function to update the dice face based on the distance moved
 function updateDiceFace(die, distance, spinFactor) {
     // calculate the index of the dice face based on the distance moved
     let faceIndex = Math.floor(distance / spinFactor % 6);
@@ -187,9 +164,40 @@ function diceRolled() {
     spinFactor = 5 + Math.floor(Math.random() * 30);
 }
 
-let allResults = [];
-let result = [];
-let res;
+
+function allDiceStoppedRolling() {
+    let rolling = dice.map(d => d.isRolling);
+    return !rolling.includes(true);
+}
+
+
+function linkDice() {
+
+    linked = true;
+
+    for (let i = 0; i < dice.length - 1; i++) {
+        var link = Constraint.create({
+            bodyA: dice[i].body,
+            bodyB: dice[i + 1].body,
+            length: 40,
+            stiffness: 0.5,
+            damping: 0.001,
+            render: { visible: false }
+        });
+
+        diceLinks.push(link);
+    }
+
+
+    Composite.add(engine.world, diceLinks);
+}
+
+function unlinkDice() {
+    linked = false;
+    Composite.remove(engine.world, diceLinks);
+}
+
+
 // add an event listener for the beforeUpdate event
 Matter.Events.on(engine, 'beforeUpdate', function (event) {
 
@@ -221,11 +229,6 @@ Matter.Events.on(engine, 'beforeUpdate', function (event) {
     }
 });
 
-
-function allDiceStoppedRolling() {
-    let rolling = dice.map(d => d.isRolling);
-    return !rolling.includes(true);
-}
 
 // add an event listener for the mouse up event
 Events.on(mouseConstraint, 'mouseup', function (event) {
